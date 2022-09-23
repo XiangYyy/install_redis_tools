@@ -1,0 +1,18 @@
+[Unit]
+Description=redis server
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/default/redis_{{ PORT }}
+Type=forking
+PIDFile={{ INSTALL_PATH }}/log/redis_{{ PORT }}.pid
+
+ExecStart={{ INSTALL_PATH }}/bin/redis-server $CONFIGFILE
+ExecStop={{ INSTALL_PATH }}/bin/redis-cli -h $IP shutdown
+PrivateTmp=true
+User={{ RUN_USER }}
+Group={{ RUN_USER }}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
