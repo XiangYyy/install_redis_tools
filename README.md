@@ -18,7 +18,7 @@
 + INSTALL_PATH：Redis 部署的目录
 + PKG_VERSION：要部署的 Redis 的版本
 + ENABLE_CLUSTERF：为 1 ，则在部署 redis 时开启 redis cluster 相关配置
-  + 并不会直接部署集群，具体集群初始化可按照 https://blog.xiangy.cloud/post/redis-cluster-deploying/ 操作
+  + 并不会直接部署集群，集群初始化操作可按照 https://blog.xiangy.cloud/post/redis-cluster-deploying/ 操作
 + SKIP_SYS_PKG_INSTALL：运行脚本时跳过使用 yum/apt 安装系统包的过程
 
 ## 使用(install_redis.conf)
