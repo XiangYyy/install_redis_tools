@@ -48,6 +48,9 @@ function InitGetOSMsg() {
 	elif [ -f "/etc/issue" ] && [ "$(awk '{print $1}' /etc/issue)" = "Ubuntu" ]; then
 		OS_NAME="Ubuntu"
 		OS_VERSION="$(awk '{print $2}' /etc/issue | head -n 1)"
+	elif [ -f "/etc/kylin-release" ] && [ "$(awk '{print $1}' /etc/kylin-release)" = "Kylin" ]; then
+		OS_NAME="Kylin"
+		OS_VERSION="$(awk -F 'release ' '{print $2}' /etc/kylin-release | awk '{print $1}')"
 	else
 		EchoError "OS Not Support"
 		exit 1
@@ -133,9 +136,9 @@ function InstallSysPkgs() {
 		return 0
 	fi
 
-	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ]; then
+	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ] || [ "$OS_NAME" = "Kylin" ]; then
 		EchoInfo "Install sys pkgs"
-		if ! yum install gcc -y; then
+		if ! yum install gcc tar -y; then
 			EchoError "Install sys pkgs faild"
 			exit 1
 		fi
@@ -192,7 +195,7 @@ function ChangeConf() {
 
 	EchoInfo "change $conf_path conf"
 
-	sed -i "s#/var/run/redis_${PORT}.pid#${INSTALL_PATH}/log/redis_${PORT}.pid#g" "$conf_path"
+	sed -i "s#/var/run/redis_6379.pid#${INSTALL_PATH}/log/redis_${PORT}.pid#g" "$conf_path"
 	sed -i "s#daemonize no#daemonize yes#g" "$conf_path"
 	sed -i "s#logfile \"\"#logfile ${INSTALL_PATH}/log/redis_${PORT}.log#g" "$conf_path"
 	sed -i "s#dir ./#dir ${INSTALL_PATH}/data/${PORT}#g" "$conf_path"
