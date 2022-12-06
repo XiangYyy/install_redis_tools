@@ -14,6 +14,18 @@ OS_CPU_TOTAL=""
 OS_RAM_TOTAL=""
 SERVICE_PATH="/etc/systemd/system"
 
+USEARGS="
+部署 Redis
+
+Usage:
+  sudo sh install_redis.sh -h [host] -p [port] -v [version]
+
+Flags:
+  -h, --host        部署的 redis 使用的 bind ip
+  -p, --port        部署的 redis 使用的端口
+  -v, --version     部署的 redis 的版本
+"
+
 # 打印Error
 function EchoError() {
 	red_color='\E[1;31m'
@@ -36,6 +48,14 @@ function CheckRunUser() {
 		exit 1
 	fi
 }
+# 检查是否输入变量
+function CheckEnterArgs() {
+	if [[ $# -eq 0 ]]; then
+		EchoError "Please run scripts with args"
+		echo "$USEARGS"
+		exit 1
+	fi
+}
 
 # 获取操作系统基本信息
 function InitGetOSMsg() {
@@ -51,6 +71,9 @@ function InitGetOSMsg() {
 	elif [ -f "/etc/kylin-release" ] && [ "$(awk '{print $1}' /etc/kylin-release)" = "Kylin" ]; then
 		OS_NAME="Kylin"
 		OS_VERSION="$(awk -F 'release ' '{print $2}' /etc/kylin-release | awk '{print $1}')"
+	elif [ -f "/etc/redflag-release" ] && [ "$(awk '{print $1}' /etc/redflag-release)" = "Asianux" ]; then
+		OS_NAME="Asianux"
+		OS_VERSION="$(awk -F 'release ' '{print $2}' /etc/redflag-release | awk '{print $1}')"
 	else
 		EchoError "OS Not Support"
 		exit 1
@@ -136,7 +159,7 @@ function InstallSysPkgs() {
 		return 0
 	fi
 
-	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ] || [ "$OS_NAME" = "Kylin" ]; then
+	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ] || [ "$OS_NAME" = "Kylin" ] || [ "$OS_NAME" = "Asianux" ]; then
 		EchoInfo "Install sys pkgs"
 		if ! yum install gcc tar -y; then
 			EchoError "Install sys pkgs faild"
@@ -264,6 +287,24 @@ function SetRedisRole() {
 	chmod -R 750 "$INSTALL_PATH"
 }
 
+function CheckArgs() {
+	if [ -z "${BIND_IP-}" ]; then
+		EchoError "use -h/--host set redis bind ip"
+		EchoInfo "$USEARGS"
+		exit 1
+	fi
+	if [ -z "${PORT-}" ]; then
+		EchoError "use -p/--port set redis listen port"
+		EchoInfo "$USEARGS"
+		exit 1
+	fi
+	if [ -z "${PKG_VERSION-}" ]; then
+		EchoError "use -v/--version set redis version"
+		EchoInfo "$USEARGS"
+		exit 1
+	fi
+}
+
 function PreCheck() {
 	CheckRunUser
 	CheckSystemExists
@@ -271,6 +312,43 @@ function PreCheck() {
 }
 
 function main() {
+
+	CheckEnterArgs "$@"
+
+	GETOPT_ARGS=$(getopt -o "h:p:v:" -al "help,host,port:,version:" -n "$0" -- "$@") || exit 1
+	# [ $? -ne 0 ] && exit 1
+	# echo "GETOPT_ARGS=$GETOPT_ARGS"
+	eval set -- "$GETOPT_ARGS"
+
+	while [ -n "${1-}" ]; do
+		case $1 in
+		--help)
+			echo "$USEARGS"
+			exit 0
+			;;
+		-h | --host)
+			BIND_IP="$2"
+			shift 2
+			;;
+		-p | --port)
+			PORT="$2"
+			shift 2
+			;;
+		-v | --version)
+			PKG_VERSION="$2"
+			shift 2
+			;;
+		--)
+			shift
+			;;
+		*)
+			EchoError "unrecognized option \'$1\'"
+			exit 1
+			;;
+		esac
+	done
+	CheckArgs
+
 	Init
 	PreCheck
 	InstallSysPkgs
