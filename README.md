@@ -5,6 +5,7 @@
 + 兼容 RedHat 7
 + 兼容 Ubuntu 20.04
 + 兼容 Kylin V10
++ 兼容 Asianux(红旗 OS)
 
 ### 兼容 Redis 版本
 + Redis5
