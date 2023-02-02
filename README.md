@@ -59,8 +59,6 @@ sudo bash install_redis.sh -h $bind_ip -p $port -v $version
 bash install_redis.sh -h $bind_ip -p $port -v $version
 # 如 bash install_redis.sh -h 10.10.0.5 -p 6379 -v 6.2.7
 ```
-+ 部署后会自动开启 redis 并配置开机自启动，可通过 systemctl status redis_$PORT.service 管理服务
-
 ## 服务管理
 + 以部署 redis 服务的端口为 6379 为例
 
