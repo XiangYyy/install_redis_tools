@@ -44,7 +44,7 @@
 + 运行脚本安装 redis
   + 参数：
     + -h：指定 redis 监听的 bind ip
-    + -p：指定 redis 监听的 port，如果使用 cluster 模式，redis 也会使用 port + 1w 段偶
+    + -p：指定 redis 监听的 port，如果使用 cluster 模式，redis 也会使用 port + 1w 端口
     + -v：指定要部署的 redis 版本
 
 + sudo 模式
