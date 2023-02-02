@@ -5,14 +5,14 @@
 set -eu
 
 # 运行用户
-RUN_USER="rcsr"
+# RUN_USER="rcsr"
 # 无需配置，脚本使用全局变量
 PKG_NAME=""
 OS_NAME=""
 OS_VERSION=""
 OS_CPU_TOTAL=""
 OS_RAM_TOTAL=""
-SERVICE_PATH="/etc/systemd/system"
+# SERVICE_PATH="/etc/systemd/system"
 
 USEARGS="
 部署 Redis
@@ -43,10 +43,11 @@ function EchoInfo() {
 # 校验运行脚本的用户
 function CheckRunUser() {
 	EchoInfo "check run user"
-	if [ $UID -ne 0 ]; then
+	if [ $UID -ne 0 ] && [ "$RUN_WITH_SUDO" -eq 1 ]; then
 		EchoError "Please use root or sudo run this script!!"
 		exit 1
 	fi
+	EchoInfo "run user check success!"
 }
 # 检查是否输入变量
 function CheckEnterArgs() {
@@ -145,7 +146,7 @@ function CheckDeployingSets() {
 		EchoError "redis port $PORT not allowed"
 		exit 1
 	fi
-	if [ "$(ss -anlp | grep -wc "\:${PORT}")" -ne "0" ]; then
+	if [ "$(ss -anlp | grep -wc "${PORT}")" -ne "0" ]; then
 		EchoError "redis port $PORT is listen"
 		exit 1
 	fi
@@ -154,6 +155,10 @@ function CheckDeployingSets() {
 
 # 安装系统依赖的基础包
 function InstallSysPkgs() {
+	if [ "$RUN_WITH_SUDO" -ne 1 ]; then
+		return 0
+	fi
+
 	if [ "$SKIP_SYS_PKG_INSTALL" -ne "0" ]; then
 		EchoInfo "skip install sys pkgs"
 		return 0
@@ -223,6 +228,7 @@ function ChangeConf() {
 	sed -i "s#logfile \"\"#logfile ${INSTALL_PATH}/log/redis_${PORT}.log#g" "$conf_path"
 	sed -i "s#dir ./#dir ${INSTALL_PATH}/data/${PORT}#g" "$conf_path"
 	sed -i "s#port 6379#port ${PORT}#g" "$conf_path"
+	sed -i "s#bind 127.0.0.1#bind $BIND_IP#g" "$conf_path"
 
 	if [ "$REDIS_PASSWORD" != "" ]; then
 		sed -i "s/# requirepass foobared/requirepass ${REDIS_PASSWORD}/g" "$conf_path"
@@ -230,6 +236,16 @@ function ChangeConf() {
 
 	if [ "$ENABLE_CLUSTER" -eq "1" ]; then
 		ChangeClusterConf
+	fi
+
+	if [ "$RENAME_STRING" != '' ]; then
+		cat >>"$conf_path" <<EOF
+$RENAME_STRING
+EOF
+	fi
+
+	if [ "$MAXMEMORY" != "" ]; then
+		sed -i "s/# maxmemory <bytes>/maxmemory $MAXMEMORY/g" "$conf_path"
 	fi
 
 }
@@ -251,9 +267,6 @@ function AddRedisSystemd() {
 	sed -i "s#{{ PORT }}#$PORT#g" "${redis_systemctl_path}"
 	sed -i "s#{{ RUN_USER }}#$RUN_USER#g" "${redis_systemctl_path}"
 
-	# 更改 redis 配置
-	sed -i "s#bind 127.0.0.1#bind $BIND_IP#g" "${INSTALL_PATH}/etc/${PORT}.conf"
-
 	if [ "$REDIS_PASSWORD" != "" ]; then
 		sed -i "s/shutdown/shutdown -a ${REDIS_PASSWORD}/g" "${redis_systemctl_path}"
 	fi
@@ -261,6 +274,18 @@ function AddRedisSystemd() {
 	systemctl daemon-reload
 	systemctl enable "$server_name"
 
+}
+# 配置启动脚本(无法配置 systemclt 时配置)
+function AddRedisControlScript() {
+	local server_name="redis_${PORT}"
+	local redis_systemctl_path="${INSTALL_PATH}/${server_name}.sh"
+
+	cd ..
+	cp -rp redis_template.sh "${redis_systemctl_path}"
+	sed -i "s#{{ BIND_IP }}#$BIND_IP#g" "${redis_systemctl_path}"
+	sed -i "s#{{ PORT }}#$PORT#g" "${redis_systemctl_path}"
+	sed -i "s#{{ INSTALL_PATH }}#$INSTALL_PATH#g" "${redis_systemctl_path}"
+	sed -i "s#{{ REDIS_PASSWORD }}#$REDIS_PASSWORD#g" "${redis_systemctl_path}"
 }
 
 # 需手动配置内容
@@ -270,21 +295,29 @@ function StartRedis() {
 	EchoInfo "bind ip: $BIND_IP"
 	EchoInfo "port: $PORT"
 
-	EchoInfo "Enable Redis_${PORT}"
-	systemctl enable "redis_${PORT}"
-	EchoInfo "Start redis_${PORT}"
-	systemctl start "redis_${PORT}"
+	if [ "$RUN_WITH_SUDO" -eq 1 ]; then
+		EchoInfo "Enable Redis_${PORT}"
+		systemctl enable "redis_${PORT}"
+		EchoInfo "Start redis_${PORT}"
+		systemctl start "redis_${PORT}"
+	else
+		EchoInfo "Start redis_${PORT}"
+		"${INSTALL_PATH}/redis_${PORT}.sh" start
+	fi
 }
 
 # 设置用户权限
 function SetRedisRole() {
-	if ! id "$RUN_USER"; then
-		EchoInfo "add $RUN_USER"
-		useradd -s /sbin/nologin -M -r $RUN_USER
+	if [ "$RUN_WITH_SUDO" -ne 0 ]; then
+		if ! id "$RUN_USER"; then
+			EchoInfo "add $RUN_USER"
+			useradd -s /sbin/nologin -M -r "$RUN_USER"
+		fi
+		EchoInfo "chown to $RUN_USER"
+		chown -R "$RUN_USER"."$RUN_USER" "$INSTALL_PATH"
 	fi
-	EchoInfo "chown to $RUN_USER"
-	chown -R $RUN_USER.$RUN_USER "$INSTALL_PATH"
-	chmod -R 750 "$INSTALL_PATH"
+	# chmod -R 750 "$INSTALL_PATH"
+	chmod -R 700 "$INSTALL_PATH"
 }
 
 function CheckArgs() {
@@ -307,7 +340,9 @@ function CheckArgs() {
 
 function PreCheck() {
 	CheckRunUser
-	CheckSystemExists
+	if [ "$RUN_WITH_SUDO" -eq 1 ]; then
+		CheckSystemExists
+	fi
 	CheckDeployingSets
 }
 
@@ -354,7 +389,13 @@ function main() {
 	InstallSysPkgs
 	BuildRedis
 	ChangeConf
-	AddRedisSystemd
+
+	if [ "$RUN_WITH_SUDO" -eq 1 ]; then
+		AddRedisSystemd
+	else
+		AddRedisControlScript
+	fi
+
 	SetRedisRole
 	StartRedis
 }
