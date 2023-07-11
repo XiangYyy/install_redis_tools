@@ -75,6 +75,9 @@ function InitGetOSMsg() {
 	elif [ -f "/etc/redflag-release" ] && [ "$(awk '{print $1}' /etc/redflag-release)" = "Asianux" ]; then
 		OS_NAME="Asianux"
 		OS_VERSION="$(awk -F 'release ' '{print $2}' /etc/redflag-release | awk '{print $1}')"
+	elif [ -f "/etc/redhat-release" ] && [ "$(awk '{print $1}' /etc/redhat-release)" = "Rocky" ]; then
+		OS_NAME="Rocky"
+		OS_VERSION="$(awk -F 'release ' '{print $2}' /etc/redhat-release | awk '{print $1}' | awk -F '.' -v OFS='.' '{print $1,$2}')"
 	else
 		EchoError "OS Not Support"
 		exit 1
@@ -164,7 +167,7 @@ function InstallSysPkgs() {
 		return 0
 	fi
 
-	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ] || [ "$OS_NAME" = "Kylin" ] || [ "$OS_NAME" = "Asianux" ]; then
+	if [ "$OS_NAME" = "CentOS" ] || [ "$OS_NAME" = "RedHat" ] || [ "$OS_NAME" = "Kylin" ] || [ "$OS_NAME" = "Asianux" ] || [ "$OS_NAME" = "Rocky" ]; then
 		EchoInfo "Install sys pkgs"
 		if ! yum install gcc tar -y; then
 			EchoError "Install sys pkgs faild"
